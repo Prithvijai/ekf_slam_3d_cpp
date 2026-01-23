@@ -27,7 +27,7 @@ EKFSLAMNode::EKFSLAMNode() : Node("ekf_slam_node") {
     
     p_ = Eigen::MatrixXd::Identity(12, 12) * 0.01;
 
-    Q_ = Eigen::MatrixXd::Identity(12, 12) * 0.1;
+    Q_ = Eigen::MatrixXd::Identity(12, 12) * 0.001;
     
 }
 
@@ -44,7 +44,7 @@ void EKFSLAMNode::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
     double vz = msg->twist.twist.linear.z;
     double wz = msg->twist.twist.angular.z;
 
-    slam_core_->predict_with_odom(state_, p_, dt, vx, vy, vz, wz);
+    slam_core_->predict_with_odom(state_, p_,Q_ ,dt, vx, vy, vz, wz);
 
 }
 void EKFSLAMNode::imu_callback(const sensor_msgs::msg::Imu::SharedPtr  msg) {
@@ -61,7 +61,7 @@ void EKFSLAMNode::imu_callback(const sensor_msgs::msg::Imu::SharedPtr  msg) {
     double ay = msg->linear_acceleration.y;
     double az = msg->linear_acceleration.z;
 
-    slam_core_->predict_with_imu(state_, p_, dt, roll_v, pitch_v, yaw_v, ax, ay, az);
+    slam_core_->predict_with_imu(state_, p_, Q_, dt, roll_v, pitch_v, yaw_v, ax, ay, az);
 
 }
 void EKFSLAMNode::point_callback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
