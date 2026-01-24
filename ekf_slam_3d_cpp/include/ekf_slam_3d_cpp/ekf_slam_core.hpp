@@ -22,15 +22,13 @@ class EKFSLAMCore {
                              double ly,    // local coord of potential landmark
                              double lz);
     
-    void mesurement_update(Eigen::VectorXd& state, Eigen::MatrixXd& P, int landmark_idx,
+    void mesurement_update(Eigen::VectorXd& state, Eigen::MatrixXd& P, const Eigen::Matrix3d& R,int landmark_idx,
                              double lx,
                              double ly,    // local coord of potential landmark
                              double lz);
                              
     void add_new_landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P,
-                             double lx,
-                             double ly,    // local coord of potential landmark
-                             double lz);
+                             Eigen::Vector3d l_gobal);
                                      
     
     double landmark_distance(Eigen::Vector3d& l_global, Eigen::Vector3d& l_new);

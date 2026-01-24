@@ -14,6 +14,10 @@ find_package(geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common io filters segmentation)
+find_package(pcl_conversions REQUIRED)
+find_package(pcl_ros REQUIRED)
+find_package(Qhull REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -27,15 +31,25 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-include_directories(include)
+include_directories(
+  include
+  ${PCL_INCLUDE_DIRS}
+  ${pcl_conversions_INCLUDE_DIRS}
+  ${pcl_ros_INCLUDE_DIRS}
+  ${ament_cmake_INCLUDE_DIRS}
+)
 
+# add_definitions(${PCL_DEFINITIONS})
 
 add_executable(ekf_slam_node
    src/main.cpp
    src/ekf_slam_node.cpp   
+   src/ekf_slam_core.cpp
 )
-target_link_libraries(ekf_slam_node Eigen3::Eigen)
-ament_target_dependencies(ekf_slam_node rclcpp std_msgs sensor_msgs nav_msgs Eigen3)
+
+
+target_link_libraries(ekf_slam_node Eigen3::Eigen ${PCL_LIBRARIES})
+ament_target_dependencies(ekf_slam_node rclcpp std_msgs sensor_msgs nav_msgs Eigen3 pcl_conversions pcl_ros)
 
 
 install(TARGETS 

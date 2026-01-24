@@ -5,7 +5,7 @@
 double EKFSLAMCore::landmark_distance(Eigen::Vector3d& l_global,Eigen::Vector3d& l_new) {
 
        int d;
-
+      // this is distance b/w two points 
        d = std::sqrt( (l_global.x() - l_new.x()) * (l_global.x() - l_new.x()) + (l_global.y() - l_new.y()) * (l_global.y() - l_new.y()) + (l_global.z() - l_new.z()) * (l_global.z() - l_new.z())) ;
 
        return d;
@@ -111,7 +111,7 @@ void EKFSLAMCore::associate_Landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P,
     Eigen::Vector3d l_gobal = (R * l) + state.head(3);
 
     if (state.size() <= 11) {
-      this->add_new_landmark(state, P, lx, ly, lz);
+      this->add_new_landmark(state, P, l_gobal);
       return;
     }
 
@@ -134,28 +134,62 @@ void EKFSLAMCore::associate_Landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P,
     }
 
     if (min_d <0.5) {
-      this->mesurement_update(state, P, idx, lx, ly, lz);
+      this->mesurement_update(state, P, R ,idx, lx, ly, lz);
     }
     else {
-       this->add_new_landmark(state, P, lx, ly, lz);
+       this->add_new_landmark(state, P, l_gobal);
     }
     
 
 }
 
-void EKFSLAMCore::mesurement_update(Eigen::VectorXd& state, Eigen::MatrixXd& P, int landmark_idx,
+void EKFSLAMCore::mesurement_update(Eigen::VectorXd& state, Eigen::MatrixXd& P, const Eigen::Matrix3d& R, int landmark_idx,
                              double lx,
                              double ly,    // local coord of potential landmark
                              double lz) {
+    
+    Eigen::Vector3d z(lx, ly, lz);  //local landmark position
+    Eigen::Vector3d landmark_gobal = state.segment<3>(landmark_idx);
+    Eigen::Vector3d robot_position = state.head(3);  // current robot position that to be updated by this landmark
+
+    Eigen::Vector3d excepted_z = R.transpose() * (landmark_gobal - robot_position);
+    
+    Eigen::Vector3d y = z - excepted_z;
+    
+    Eigen::MatrixXd H = Eigen::MatrixXd::Zero(3, state.size());
+
+    H.block<3, 3>(0, 0) = - R.transpose();
+
+    H.block<3, 3>(0, landmark_idx) = R.transpose();
+
+    Eigen::Matrix3d R_noise  = Eigen::Matrix3d::Identity() * 0.01;
+    Eigen:: MatrixXd S = H * P * H.transpose() + R_noise; 
+
+    Eigen::MatrixXd K = P * H.transpose() * S.inverse();  // the  kalman gain
+
+    // state and covariance updates 
+    state = state + (K * y);
+    Eigen::MatrixXd I = Eigen::MatrixXd::Identity(state.size(), state.size());
+    P =  (I - K * H) * P ;
+
 
     
 }
 
 void EKFSLAMCore::add_new_landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P,
-                             double lx,
-                             double ly,    // local coord of potential landmark
-                             double lz) {
+                              Eigen::Vector3d l_gobal) { 
+    
+    int old_size = state.size();
+    int new_size = old_size + 3;
+    
+    state.conservativeResize(new_size);
+    state.tail(3) = l_gobal;
 
-                        
+    P.conservativeResize(new_size, new_size);   // p = [[P, top-right], [bottom-left, bottom-right]]
+    
+    P.block(old_size, 0, 3, old_size).setZero();  //bottom-left of new P 
+    P.block(0, old_size, old_size, 3).setZero();  // top-right of new P 
+
+    P.block(old_size, old_size, 3, 3) = Eigen::Matrix3d::Identity() * 0.1;                     
 
 }
