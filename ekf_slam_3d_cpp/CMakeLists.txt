@@ -45,6 +45,7 @@ add_executable(ekf_slam_node
    src/main.cpp
    src/ekf_slam_node.cpp   
    src/ekf_slam_core.cpp
+   src/feature_extraction.cpp
 )
 
 

@@ -41,7 +41,7 @@ void EKFSLAMCore::predict_with_imu(Eigen::VectorXd& state, Eigen::MatrixXd& P,
     state(10) = p_v;
     state(11) =y_v;
 
-    Eigen::MatrixXd F = Eigen::MatrixXd::Identity(12,12);
+    Eigen::MatrixXd F = Eigen::MatrixXd::Identity(P.rows(),P.cols());
 
     F(3, 9) = dt;
     F(4, 10) = dt;
@@ -52,7 +52,11 @@ void EKFSLAMCore::predict_with_imu(Eigen::VectorXd& state, Eigen::MatrixXd& P,
 
     F.block<3, 3>(0, 6) = R * dt;
 
-    P = F * P * F.transpose() + Q;
+    Eigen::MatrixXd Q_dynamic = Eigen::MatrixXd::Zero(P.rows(), P.cols());
+
+    Q_dynamic.block<12, 12>(0, 0) = Q;
+
+    P = F * P * F.transpose() + Q_dynamic;
 
 }
 
@@ -78,7 +82,7 @@ void EKFSLAMCore::predict_with_odom(Eigen::VectorXd& state, Eigen::MatrixXd& P,
     state(5) += az * dt;
     state(11) = az;
 
-    Eigen::MatrixXd F = Eigen::MatrixXd::Identity(12,12);
+    Eigen::MatrixXd F = Eigen::MatrixXd::Identity(P.rows(),P.cols());
 
     F(3, 9) = dt;
     F(4, 10) = dt;
@@ -89,7 +93,11 @@ void EKFSLAMCore::predict_with_odom(Eigen::VectorXd& state, Eigen::MatrixXd& P,
 
     F.block<3, 3>(0, 6) = R * dt;
 
-    P = F * P * F.transpose() + Q;
+    Eigen::MatrixXd Q_dynamic = Eigen::MatrixXd::Zero(P.rows(), P.cols());
+
+    Q_dynamic.block<12, 12>(0, 0) = Q;
+
+    P = F * P * F.transpose() + Q_dynamic;
 
                 
     
@@ -190,6 +198,7 @@ void EKFSLAMCore::add_new_landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P,
     P.block(old_size, 0, 3, old_size).setZero();  //bottom-left of new P 
     P.block(0, old_size, old_size, 3).setZero();  // top-right of new P 
 
-    P.block(old_size, old_size, 3, 3) = Eigen::Matrix3d::Identity() * 0.1;                     
+    P.block(old_size, old_size, 3, 3) = Eigen::Matrix3d::Identity() * 0.1;  
+                       
 
 }
