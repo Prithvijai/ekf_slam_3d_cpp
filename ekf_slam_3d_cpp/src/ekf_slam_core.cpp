@@ -141,7 +141,7 @@ void EKFSLAMCore::associate_Landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P,
 
     }
 
-    if (min_d <0.5) {
+    if (min_d <1.5) {
       this->mesurement_update(state, P, R ,idx, lx, ly, lz);
     }
     else {
@@ -167,10 +167,20 @@ void EKFSLAMCore::mesurement_update(Eigen::VectorXd& state, Eigen::MatrixXd& P, 
     Eigen::MatrixXd H = Eigen::MatrixXd::Zero(3, state.size());
 
     H.block<3, 3>(0, 0) = - R.transpose();
+    double yaw = state(5);
+
+    Eigen::Matrix3d dR_dyaw;
+
+    dR_dyaw << -sin(yaw), -cos(yaw), 0,
+                cos(yaw), -sin(yaw), 0,
+                0,        0,        0;
+
+    Eigen::Vector3d diff = landmark_gobal - robot_position;
+    H.block<3, 1>(0, 5) = dR_dyaw.transpose() * diff;
 
     H.block<3, 3>(0, landmark_idx) = R.transpose();
 
-    Eigen::Matrix3d R_noise  = Eigen::Matrix3d::Identity() * 0.01;
+    Eigen::Matrix3d R_noise  = Eigen::Matrix3d::Identity() * 0.5;
     Eigen:: MatrixXd S = H * P * H.transpose() + R_noise; 
 
     Eigen::MatrixXd K = P * H.transpose() * S.inverse();  // the  kalman gain
@@ -179,6 +189,10 @@ void EKFSLAMCore::mesurement_update(Eigen::VectorXd& state, Eigen::MatrixXd& P, 
     state = state + (K * y);
     Eigen::MatrixXd I = Eigen::MatrixXd::Identity(state.size(), state.size());
     P =  (I - K * H) * P ;
+
+    state(2) = 0.0;
+    state(3) = 0.0;
+    state(4) = 0.0;
 
 
     
