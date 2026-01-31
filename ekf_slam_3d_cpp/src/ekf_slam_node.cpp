@@ -34,13 +34,13 @@ EKFSLAMNode::EKFSLAMNode() : Node("ekf_slam_node") {
                     );
 
     path_history_.header.frame_id = "odom";
-    state_ = Eigen::VectorXd::Zero(12);   // [x, y, z, roll, pitch, yaw, 6 other velcoities ] for the state vector
+    state_ = Eigen::VectorXd::Zero(3);   // [x, y, yaw ] for the state vector (corrected) previous 12 state to remove drifts 
 
     last_time_ = this->now();
     
-    p_ = Eigen::MatrixXd::Identity(12, 12) * 0.01;
+    p_ = Eigen::MatrixXd::Identity(3, 3) * 0.01;
 
-    Q_ = Eigen::MatrixXd::Identity(12, 12) * 0.001;
+    Q_ = Eigen::MatrixXd::Identity(3, 3) * 0.001;
     
 }
 
@@ -61,12 +61,11 @@ void EKFSLAMNode::odom_callback(const nav_msgs::msg::Odometry::SharedPtr msg) {
     last_time_ = rclcpp::Time(msg->header.stamp);
 
     double vx = msg->twist.twist.linear.x;
-    double vy = msg->twist.twist.linear.y;
-    double vz = msg->twist.twist.linear.z;
     double wz = msg->twist.twist.angular.z;
+    RCLCPP_INFO(this->get_logger(), "Teleop control: %.2f, %.2f",vx, wz);
 
-    slam_core_->predict_with_odom(state_, p_,Q_ ,dt, vx, vy, vz, wz);
-
+    slam_core_->predict_with_odom(state_, p_,Q_ ,dt, vx, wz);
+    // state_(2) = 0;
     // RCLCPP_INFO(this->get_logger(), "New landmark added! Map size: %ld", state_.size());
 
 }
@@ -116,7 +115,7 @@ void EKFSLAMNode::point_callback(const sensor_msgs::msg::PointCloud2::SharedPtr 
     publish_path();
     publish_landmark();
     
-    RCLCPP_INFO(this->get_logger(), "New landmark added! Map size: %ld, Pos: %.2f, %.2f, %.2f", state_.size(), state_.x(), state_.y(), state_.z());
+    RCLCPP_INFO(this->get_logger(), "New landmark added! Map size: %ld, Pos: %.2f, %.2f, Z: %.2f", state_.size(), state_.x(), state_.y(), state_.z());
 }
 
 
@@ -127,7 +126,7 @@ void EKFSLAMNode::publish_path() {
     pose.header.frame_id = "odom";
     pose.pose.position.x = state_(0);
     pose.pose.position.y = state_(1);
-    pose.pose.position.z = state_(2);
+    pose.pose.position.z = 0.0;
 
     path_history_.poses.push_back(pose);
     path_pub_->publish(path_history_);
@@ -135,7 +134,7 @@ void EKFSLAMNode::publish_path() {
 }
 void EKFSLAMNode::publish_landmark() {
     visualization_msgs::msg::MarkerArray marker_array;
-    for (int i =12; i < state_.size(); i+= 3) {
+    for (int i =3; i < state_.size(); i+= 3) {
         visualization_msgs::msg::Marker marker;
         marker.header.frame_id = "odom";
         marker.header.stamp = this->now();
@@ -148,8 +147,8 @@ void EKFSLAMNode::publish_landmark() {
         marker.pose.position.y = state_(i+1);
         marker.pose.position.z = state_(i+2);
 
-        marker.scale.x = 0.3; marker.scale.y = 0.3; marker.scale.z = 0.3;
-        marker.color.a = 1.0; marker.color.r = 1.0; marker.color.g = 0.0; marker.color.b = 0.0;
+        marker.scale.x = 0.1; marker.scale.y = 0.1; marker.scale.z = 0.1;
+        marker.color.a = 1.0; marker.color.r = 0.0; marker.color.g = 1.0; marker.color.b = 0.0;
         marker_array.markers.push_back(marker);
     }
     landmark_pub_->publish(marker_array);
