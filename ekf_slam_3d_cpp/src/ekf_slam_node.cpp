@@ -108,10 +108,18 @@ void EKFSLAMNode::point_callback(const sensor_msgs::msg::PointCloud2::SharedPtr 
     sor.setLeafSize(0.1f, 0.1f, 0.1f);
     sor.filter(*cloud);
 
-    Eigen::Vector3d landmark = Eigen::Vector3d::Zero();
-    feature_->feature_extraction_gazebo(*cloud, landmark);
+    std::vector<Eigen::Vector3d> landmarks; //multiple landmarks 
+    // Eigen::Vector3d landmark = Eigen::Vector3d::Zero();
+    // feature_->feature_extraction_gazebo(*cloud, landmarks);
+    feature_->feature_extraction_multiple_gazebo(*cloud, landmarks);
 
-    slam_core_->associate_Landmark(state_, p_, landmark.x(), landmark.y(), landmark.z());
+    for (const auto& lm : landmarks) {
+        double d = lm.norm();
+        if (d < 10.0) {
+            slam_core_->associate_Landmark(state_, p_,lm);
+        }
+    }
+    // slam_core_->associate_Landmark(state_, p_, landmarks.x(), landmarks.y(), landmarks.z());
     publish_path();
     publish_landmark();
     

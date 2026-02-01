@@ -70,6 +70,7 @@ void EKFSLAMCore::predict_with_odom(Eigen::VectorXd& state, Eigen::MatrixXd& P,
     state(1) += sin(old_yaw) * vx * dt;
 
     state(2) += az * dt;
+   //  state(2) = atan2(sin(state(2)), cos(state(2)));
 
     Eigen::MatrixXd F = Eigen::MatrixXd::Identity(P.rows(), P.cols());  // since the state and q is increasing with landmarks  F also increase
     // F is Jaboican matrix of state vector 
@@ -87,52 +88,49 @@ void EKFSLAMCore::predict_with_odom(Eigen::VectorXd& state, Eigen::MatrixXd& P,
 
 
 void EKFSLAMCore::associate_Landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P,
-                             double lx,
-                             double ly,    // local coord of potential landmark
-                             double lz) {
+                             Eigen::Vector3d l_local) {
     
-    Eigen::Vector3d l_gobal;
-    
-    Eigen::Vector3d l_local(lx, ly, lz);
+    // 1. Calculate the rotation and global position of the candidate landmark
     Eigen::Matrix3d R_yaw;
-    R_yaw << cos(state(2)) , - sin(state(2)), 0,
-             sin(state(2)), cos(state(2)),  0 ,
-             0             , 0            , 1;
+    R_yaw << cos(state(2)), -sin(state(2)), 0,
+             sin(state(2)),  cos(state(2)), 0,
+             0,              0,             1;
 
-    Eigen::Vector3d robot_position(state(0), state(1), 0.0);     //since the robot is 2d
-    l_gobal = R_yaw * l_local + robot_position;
+    Eigen::Vector3d robot_position(state(0), state(1), 0.0);
+    Eigen::Vector3d l_gobal = R_yaw * l_local + robot_position;
 
+    // 2. If no landmarks exist yet, add this one immediately
     if (state.size() <= 3) {
-      this->add_new_landmark(state, P, l_gobal);
+      this->add_new_landmark(state, P, R_yaw, l_gobal);
       return;
     }
 
-    double min_d = 0.1;
+    // 3. Simple Euclidean Distance Matching
+    double min_d = 1.5; // Your requested threshold
     int idx = -1;
 
-    for(int i=3; i < state.size(); i+=3)
+    for(int i = 3; i < state.size(); i += 3)
     {
-      
-       Eigen::Vector3d landmark = state.segment(i, 3);
-       double d = this->landmark_distance(l_gobal, landmark);
+       Eigen::Vector3d existing_landmark = state.segment<3>(i);
+       
+       // Calculate Euclidean distance (std::sqrt of sum of squares)
+       double d = (l_gobal - existing_landmark).norm();
        
        if (d < min_d) {
-          min_d = d;   // we are finding the nearest neighbour's distance and check if it is less that theshold
+          min_d = d;
           idx = i;
-          
        }
-
     }
 
+    // 4. Update if matched, otherwise add as new
     if (idx != -1) {
-      this->mesurement_update(state, P, R_yaw ,idx, l_local);
+      this->mesurement_update(state, P, R_yaw, idx, l_local);
     }
     else {
-       this->add_new_landmark(state, P, l_gobal);
+       this->add_new_landmark(state, P, R_yaw, l_gobal);
     }
-    
-
 }
+
 
 void EKFSLAMCore::mesurement_update(Eigen::VectorXd& state, Eigen::MatrixXd& P, const Eigen::Matrix3d& R, int landmark_idx,
                              Eigen::Vector3d l_local) {
@@ -162,13 +160,18 @@ void EKFSLAMCore::mesurement_update(Eigen::VectorXd& state, Eigen::MatrixXd& P, 
     Eigen::MatrixXd K = P * H.transpose() * S.inverse();  // the  kalman gain
 
     // state and covariance updates 
+    double d2 = y.transpose() * S.inverse() * y;
+
+    if (d2 > 7.81) {
+    return; // Stop the update. This prevents the "jumping" path.
+   }
     state = state + (K * y);
     Eigen::MatrixXd I = Eigen::MatrixXd::Identity(state.size(), state.size());
     P =  (I - K * H) * P ;
 
 }
 
-void EKFSLAMCore::add_new_landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P,
+void EKFSLAMCore::add_new_landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P, const Eigen::Matrix3d& R,
                               Eigen::Vector3d l_gobal) { 
     
     int old_size = state.size();
@@ -190,7 +193,9 @@ void EKFSLAMCore::add_new_landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P,
     dR_dyaw << -sin(state(2)), -cos(state(2)), 0,
                 cos(state(2)), -sin(state(2)), 0,
                 0,         0,        0;
-    Gr.block<3, 1>(0, 2) = dR_dyaw * (l_gobal - robot_position);
+   //  Gr.block<3, 1>(0, 2) = dR_dyaw * (l_gobal - robot_position);
+    Eigen::Vector3d l_local = R.transpose() * (l_gobal - robot_position);
+    Gr.block<3, 1>(0, 2) = dR_dyaw * l_local;
 
     P.block(old_size, 0, 3, old_size) = Gr * P.topLeftCorner(old_size, old_size);
     P.block(0, old_size, old_size, 3) = P.block(old_size, 0, 3, old_size).transpose();

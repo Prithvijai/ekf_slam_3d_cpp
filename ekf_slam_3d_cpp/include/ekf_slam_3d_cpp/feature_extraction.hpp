@@ -11,6 +11,8 @@ class FeatureExtractor {
 
     void feature_extraction_gazebo(const pcl::PointCloud<pcl::PointXYZ>& cloud, Eigen::Vector3d &landmark);
 
+    void feature_extraction_multiple_gazebo(const pcl::PointCloud<pcl::PointXYZ>& cloud, std::vector<Eigen::Vector3d> &landmarks);
+
 
 };
 

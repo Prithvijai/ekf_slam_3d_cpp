@@ -3,6 +3,7 @@
 
 
 #include <Eigen/Dense>
+#include <limits>
 
 class EKFSLAMCore {
     public:
@@ -18,14 +19,12 @@ class EKFSLAMCore {
                             double vx, double az); // linear velocitiy  & angular accelrations 
 
     void associate_Landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P,
-                             double lx,
-                             double ly,    // local coord of potential landmark
-                             double lz);
+                            Eigen::Vector3d l_local);// local coord of potential landmark
     
     void mesurement_update(Eigen::VectorXd& state, Eigen::MatrixXd& P, const Eigen::Matrix3d& R,int landmark_idx,
                              Eigen::Vector3d l_local);
                              
-    void add_new_landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P,
+    void add_new_landmark(Eigen::VectorXd& state, Eigen::MatrixXd& P,const Eigen::Matrix3d& R,
                              Eigen::Vector3d l_gobal);
                                      
     
